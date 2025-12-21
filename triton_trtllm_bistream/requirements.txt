@@ -1,0 +1,6 @@
+fastapi
+uvicorn[standard]
+tritonclient[all]
+soundfile
+numpy
+python-multipart
