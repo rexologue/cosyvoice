@@ -1,0 +1,65 @@
+name: "llm_bistream"
+backend: "python"
+max_batch_size: 16
+
+# Enable decoupled transaction policy for streaming responses
+model_transaction_policy {
+  decoupled: true
+}
+
+dynamic_batching {
+  preferred_batch_size: [ 4, 8, 16 ]
+  max_queue_delay_microseconds: 1000
+}
+
+input [
+  { name: "session_id" data_type: TYPE_BYTES dims: [ 1 ] },
+  { name: "text" data_type: TYPE_BYTES dims: [ -1 ] },
+  { name: "is_start" data_type: TYPE_BOOL dims: [ 1 ] },
+  { name: "is_end" data_type: TYPE_BOOL dims: [ 1 ] },
+  { name: "streaming" data_type: TYPE_BOOL dims: [ 1 ] },
+  { name: "max_tokens" data_type: TYPE_INT32 dims: [ 1 ] },
+  { name: "temperature" data_type: TYPE_FP32 dims: [ 1 ] },
+  { name: "top_p" data_type: TYPE_FP32 dims: [ 1 ] },
+  { name: "top_k" data_type: TYPE_INT32 dims: [ 1 ] }
+]
+
+output [
+  { name: "speech_token_ids" data_type: TYPE_INT32 dims: [ -1 ] },
+  { name: "is_final" data_type: TYPE_BOOL dims: [ 1 ] },
+  { name: "finish_reason" data_type: TYPE_INT32 dims: [ 1 ] }
+]
+
+parameters: {
+  key: "engine_dir"
+  value: { string_value: "${engine_dir}" }
+}
+parameters: {
+  key: "llm_tokenizer_dir"
+  value: { string_value: "${llm_tokenizer_dir}" }
+}
+parameters: {
+  key: "mix_ratio"
+  value: { string_value: "${mix_ratio}" }
+}
+parameters: {
+  key: "session_timeout_s"
+  value: { string_value: "180" }
+}
+parameters: {
+  key: "max_sessions"
+  value: { string_value: "${max_sessions}" }
+}
+parameters: {
+  key: "max_batch_tokens"
+  value: { string_value: "${max_batch_tokens}" }
+}
+parameters: {
+  key: "log_level"
+  value: { string_value: "${log_level}" }
+}
+
+instance_group [
+  { kind: KIND_GPU count: 1 }
+]
+
