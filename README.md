@@ -101,6 +101,9 @@
     conda activate cosyvoice
     pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple/ --trusted-host=mirrors.aliyun.com
 
+    # Install additional dependencies required by Matcha-TTS components
+    pip install -r third_party/Matcha-TTS/requirements.txt -i https://mirrors.aliyun.com/pypi/simple/ --trusted-host=mirrors.aliyun.com
+
     # If you encounter sox compatibility issues
     # ubuntu
     sudo apt-get install sox libsox-dev
