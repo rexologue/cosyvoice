@@ -4,7 +4,9 @@ ENV PYTHONUNBUFFERED=1
 WORKDIR /workspace
 
 COPY triton_trtllm_bistream/requirements.txt /workspace/requirements.txt
-RUN pip install --no-cache-dir -r /workspace/requirements.txt
+COPY third_party/Matcha-TTS/requirements.txt /workspace/third_party/Matcha-TTS/requirements.txt
+RUN pip install --no-cache-dir -r /workspace/requirements.txt \
+    && pip install --no-cache-dir -r /workspace/third_party/Matcha-TTS/requirements.txt
 
 COPY triton_trtllm_bistream /workspace/triton_trtllm_bistream
 
