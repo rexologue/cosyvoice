@@ -23,6 +23,8 @@ ENGINE_DIR=""
 TOKENIZER_DIR=""
 MODEL_DIR=""
 DECOUPLED=1
+HOST_REPO_MOUNT="/workspace/CosyVoice"
+CONTAINER_WORKDIR="/workspace/.workdir"
 
 usage() {
   cat <<EOF
@@ -63,6 +65,48 @@ if [[ -z "$MODEL_PATH" ]]; then
 fi
 
 mkdir -p "$WORKDIR"
+WORKDIR=$(cd "$WORKDIR" && pwd)
+MODEL_PATH=$(cd "$MODEL_PATH" && pwd)
+TEMPLATE_ROOT=$(cd "$TEMPLATE_ROOT" && pwd)
+MODEL_REPO=$(cd "$MODEL_REPO" && pwd)
+HOST_UID=$(id -u)
+HOST_GID=$(id -g)
+DOCKER_USER="$HOST_UID:$HOST_GID"
+
+IMAGE_NAME=cosyvoice-bistream:latest
+IMAGE_BUILT=0
+
+build_image_if_needed() {
+  if [[ $IMAGE_BUILT -eq 1 ]]; then
+    return
+  fi
+
+  if [[ $NO_BUILD -eq 0 ]]; then
+    docker build -t $IMAGE_NAME -f "$RUNTIME_ROOT/docker/Dockerfile" "$REPO_ROOT"
+  else
+    if ! docker image inspect $IMAGE_NAME >/dev/null 2>&1; then
+      echo "Docker image $IMAGE_NAME not found. Run without --no-build first to build it." >&2
+      exit 1
+    fi
+  fi
+
+  IMAGE_BUILT=1
+}
+
+common_docker_run() {
+  docker run --rm --gpus "device=${DEVICES}" --net host --shm-size=2g --user "$DOCKER_USER" \
+    -e PYTHONPATH="$HOST_REPO_MOUNT:${PYTHONPATH:-}" \
+    -v "$REPO_ROOT":"$HOST_REPO_MOUNT" \
+    -v "$WORKDIR":"$CONTAINER_WORKDIR" \
+    -w "$HOST_REPO_MOUNT/triton_trtllm_bistream" \
+    "$@"
+}
+
+MODEL_MOUNT=/workspace/input_model
+ENGINE_MOUNT="$CONTAINER_WORKDIR/engines"
+TOKENIZER_MOUNT="$CONTAINER_WORKDIR/tokenizer"
+MODEL_DIR_MOUNT="$CONTAINER_WORKDIR/model_dir"
+MODEL_REPO_MOUNT="$CONTAINER_WORKDIR/model_repo"
 
 # Determine model layout
 if [[ -f "$MODEL_PATH/config.json" ]]; then
@@ -74,8 +118,11 @@ if [[ -f "$MODEL_PATH/config.json" ]]; then
     echo "Conversion required but --no-convert set" >&2
     exit 1
   fi
-  python3 "$SCRIPT_DIR/convert_checkpoint.py" --model_dir "$MODEL_PATH" --output_dir "$WORKDIR/trt_weights" --dtype bfloat16
-  trtllm-build --checkpoint_dir "$WORKDIR/trt_weights" --output_dir "$ENGINE_DIR" --max_batch_size 16 --max_num_tokens 32768 --gemm_plugin bfloat16
+  build_image_if_needed
+  common_docker_run -v "$MODEL_PATH":"$MODEL_MOUNT":ro "$IMAGE_NAME" bash -lc "set -euo pipefail; \
+    mkdir -p \"$CONTAINER_WORKDIR/trt_weights\" \"$ENGINE_MOUNT\"; \
+    python3 runtime/scripts/convert_checkpoint.py --model_dir \"$MODEL_MOUNT\" --output_dir \"$CONTAINER_WORKDIR/trt_weights\" --dtype bfloat16; \
+    trtllm-build --checkpoint_dir \"$CONTAINER_WORKDIR/trt_weights\" --output_dir \"$ENGINE_MOUNT\" --max_batch_size 16 --max_num_tokens 32768 --gemm_plugin bfloat16"
 else
   echo "Assuming TensorRT-LLM engine directory"
   ENGINE_DIR="$MODEL_PATH"
@@ -83,23 +130,28 @@ else
   MODEL_DIR="$MODEL_PATH"
 fi
 
+ENGINE_DIR=$(cd "$ENGINE_DIR" && pwd)
+TOKENIZER_DIR=$(cd "$TOKENIZER_DIR" && pwd)
+MODEL_DIR=$(cd "$MODEL_DIR" && pwd)
+
 # Prepare model repository
 rm -rf "$MODEL_REPO"
-python3 -m triton_trtllm_bistream.runtime.scripts.prepare_model_repo \
-  --template-root "$TEMPLATE_ROOT" \
-  --output-root "$MODEL_REPO" \
-  --engine-dir "$ENGINE_DIR" \
-  --llm-tokenizer-dir "$TOKENIZER_DIR" \
-  --model-dir "$MODEL_DIR" \
-  --instances "$INSTANCES" \
-  --decoupled \
-  --log-level "$LOG_LEVEL"
-
-# Build docker image
-IMAGE_NAME=cosyvoice-bistream:latest
-if [[ $NO_BUILD -eq 0 ]]; then
-  docker build -t $IMAGE_NAME -f "$RUNTIME_ROOT/docker/Dockerfile" "$REPO_ROOT"
-fi
+build_image_if_needed
+common_docker_run \
+  -v "$ENGINE_DIR":"$ENGINE_MOUNT" \
+  -v "$MODEL_DIR":"$MODEL_DIR_MOUNT" \
+  -v "$TOKENIZER_DIR":"$TOKENIZER_MOUNT" \
+  -v "$MODEL_REPO":"$MODEL_REPO_MOUNT" \
+  "$IMAGE_NAME" bash -lc "set -euo pipefail; \
+    python3 -m triton_trtllm_bistream.runtime.scripts.prepare_model_repo \
+      --template-root \"$HOST_REPO_MOUNT/triton_trtllm_bistream/runtime/model_repo_templates\" \
+      --output-root \"$MODEL_REPO_MOUNT\" \
+      --engine-dir \"$ENGINE_MOUNT\" \
+      --llm-tokenizer-dir \"$TOKENIZER_MOUNT\" \
+      --model-dir \"$MODEL_DIR_MOUNT\" \
+      --instances \"$INSTANCES\" \
+      --decoupled \
+      --log-level \"$LOG_LEVEL\""
 
 # Launch container
 CONTAINER_NAME=cosyvoice-bistream-runtime
@@ -107,7 +159,7 @@ if docker ps -a --format '{{.Names}}' | grep -Eq "^${CONTAINER_NAME}$"; then
   docker rm -f "$CONTAINER_NAME"
 fi
 
-docker run -it --gpus "device=${DEVICES}" --net host --shm-size=2g --name "$CONTAINER_NAME" \
+docker run -it --gpus "device=${DEVICES}" --net host --shm-size=2g --name "$CONTAINER_NAME" --user "$DOCKER_USER" \
   -e STARTUP_REFERENCE="$STARTUP_REFERENCE" \
   -e MODEL_REPO_PATH="$MODEL_REPO" \
   -e SERVICE_PORT="$SERVICE_PORT" \
