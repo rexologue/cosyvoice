@@ -3,10 +3,13 @@ FROM nvcr.io/nvidia/tritonserver:25.06-trtllm-python-py3
 ENV PYTHONUNBUFFERED=1
 WORKDIR /workspace
 
-COPY triton_trtllm_bistream/requirements.txt /workspace/requirements.txt
-COPY third_party/Matcha-TTS/requirements.txt /workspace/third_party/Matcha-TTS/requirements.txt
-RUN pip install --no-cache-dir -r /workspace/requirements.txt \
-    && pip install --no-cache-dir -r /workspace/third_party/Matcha-TTS/requirements.txt
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    python3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
 COPY triton_trtllm_bistream /workspace/triton_trtllm_bistream
 
