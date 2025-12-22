@@ -4,7 +4,10 @@ set -euo pipefail
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 RUNTIME_ROOT=$(cd "$SCRIPT_DIR/.." && pwd)
 REPO_ROOT=$(cd "$RUNTIME_ROOT/../.." && pwd)
-export PYTHONPATH="$REPO_ROOT:$PYTHONPATH"
+export PYTHONPATH="$REPO_ROOT:${PYTHONPATH:-}"
+
+echo $RUNTIME_ROOT
+echo $REPO_ROOT
 
 MODEL_PATH=""
 TRITON_HTTP_PORT=8000
