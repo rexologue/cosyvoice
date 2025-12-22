@@ -1,12 +1,12 @@
 import argparse
 import asyncio
-import argparse
-import asyncio
 import base64
 import io
 import json
 import logging
+import os
 import queue
+import sys
 from typing import AsyncGenerator, Dict, Optional
 
 import numpy as np
@@ -14,8 +14,18 @@ import soundfile as sf
 import tritonclient.grpc as grpcclient
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse, StreamingResponse
-from matcha.utils.audio import mel_spectrogram
 import torch
+
+ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(f"{ROOT_DIR}/../../..")
+sys.path.append(f"{ROOT_DIR}/../../../third_party/Matcha-TTS")
+
+from matcha.utils.audio import mel_spectrogram
+
+try:
+    torch.multiprocessing.set_start_method("spawn")
+except RuntimeError:
+    pass
 
 _LOGGER = logging.getLogger("bistream_service")
 
