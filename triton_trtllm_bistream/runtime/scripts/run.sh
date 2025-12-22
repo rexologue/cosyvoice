@@ -67,7 +67,7 @@ if [[ -z "$MODEL_PATH" ]]; then
   exit 1
 fi
 
-mkdir -p "$WORKDIR"
+mkdir -p "$WORKDIR" "$MODEL_REPO"
 WORKDIR=$(cd "$WORKDIR" && pwd)
 MODEL_PATH=$(cd "$MODEL_PATH" && pwd)
 TEMPLATE_ROOT=$(cd "$TEMPLATE_ROOT" && pwd)
