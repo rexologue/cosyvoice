@@ -76,7 +76,7 @@ HOST_UID=$(id -u)
 HOST_GID=$(id -g)
 DOCKER_USER="$HOST_UID:$HOST_GID"
 
-IMAGE_NAME=cosyvoice-bistream:latest
+IMAGE_NAME=cosyvoice_bistream:latest
 IMAGE_BUILT=0
 
 build_image_if_needed() {

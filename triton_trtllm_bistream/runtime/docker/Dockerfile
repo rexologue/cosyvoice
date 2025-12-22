@@ -1,19 +1,11 @@
 FROM nvcr.io/nvidia/tritonserver:25.06-trtllm-python-py3
+LABEL maintainer="zhangyuekai@foxmail.com"
 
-ENV PYTHONUNBUFFERED=1
+RUN apt-get update && apt-get install -y cmake
+RUN git clone https://github.com/pytorch/audio.git && cd audio && git checkout c670ad8 && PATH=/usr/local/cuda/bin:$PATH python3 setup.py develop
+COPY ./requirements.txt /workspace/requirements.txt
+RUN pip install --no-cache-dir onnxruntime-gpu --no-deps
+RUN pip install -r /workspace/requirements.txt
 WORKDIR /workspace
-
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    python3-dev \
-    && rm -rf /var/lib/apt/lists/*
-
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-COPY triton_trtllm_bistream /workspace/triton_trtllm_bistream
-
-COPY triton_trtllm_bistream/runtime/docker/entrypoint.sh /opt/entrypoint.sh
-RUN chmod +x /opt/entrypoint.sh
 
 ENTRYPOINT ["/opt/entrypoint.sh"]
