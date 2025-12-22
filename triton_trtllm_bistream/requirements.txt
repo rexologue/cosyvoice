@@ -5,3 +5,4 @@ soundfile
 numpy
 python-multipart
 hydra-core==1.3.2
+lightning
