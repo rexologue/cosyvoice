@@ -4,7 +4,7 @@ set -euo pipefail
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 RUNTIME_ROOT=$(cd "$SCRIPT_DIR/.." && pwd)
 REPO_ROOT=$(cd "$RUNTIME_ROOT/../.." && pwd)
-export PYTHONPATH="$REPO_ROOT:${PYTHONPATH:-}"
+export PYTHONPATH="$REPO_ROOT:${PYTHONPATH:-}:/workspace/CosyVoice/third_party/Matcha-TTS"
 
 echo $RUNTIME_ROOT
 echo $REPO_ROOT
